@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/apps/live-planet/logo.png">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Mastery Consulting</title>
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Cesium.js"></script>
+    <link href="https://cesium.com/downloads/cesiumjs/releases/1.118/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <script src="/vue.global.prod.min.js"></script>
+    <style lang="scss" scoped>
+      ::-webkit-scrollbar { width: 12px;}
+      ::-webkit-scrollbar-track { background-color: rgba(255, 255, 255, 0.1);}
+      ::-webkit-scrollbar-thumb { background-color: rgba(50, 50, 50, 0.5); border-radius: 10px;}
+      ::-webkit-scrollbar-thumb:hover { background-color: rgba(150, 180, 180, 0.7);}
+
+      .main-view {
+       .settings {
+          width: 150px;
+          position: absolute;
+          top: 0px;
+          left: 5px;
+          margin-top: 5px;
+          margin-left: 5px; 
+          border-spacing: 0px;
+          border: 1px solid white;
+          .settings-body {
+            display: block;
+            overflow-y: auto;  
+            .title-label {
+              font-size: 10px;     
+              color: #fff;
+            }
+            .link-container {
+              .top-link {
+                font-size: 10px;
+                color: white;
+                text-decoration: underline;
+              }
+              .top-link:hover {
+                  background-color: rgba(125,125,125,0.7);
+                  text-decoration: underline;
+                }
+              .top-link:active {
+                background-color: rgba(125,125,125,0.7);
+                  text-decoration: underline;
+                }
+            }
+            .option-label{
+              display: flex;
+              align-items: center;
+              color: #fff;
+              font-size: 10px;
+            }
+            .option-checkbox {
+              margin-top: 0;
+              margin-bottom: 0;
+              margin-left: 0;
+              margin-right: 5px;
+              padding-top: 0;
+            }
+            .slider {
+              margin: 0;
+              margin-right: 5px;
+              width: 55px;
+              border-radius: 6px;
+              cursor: pointer;
+            }  
+            .timeseries-select {
+              width: 135px;
+
+              opacity: 0.5;
+              font-size: 10px;
+              border-radius: 6px;
+              cursor: pointer;
+              .timeseries-option {
+                color: black;
+              }
+            }  
+            .listbox {
+              border: 1px solid #ccc; 
+              width: 135px;
+              padding: 0;
+              margin: 0;
+              list-style: none;
+              /* Styling for each listbox item */
+              .listbox-item {
+                display: flex;
+                align-items: center;
+                cursor: pointer;
+                border-bottom: 1px solid #eee;
+              }
+              /* Colored rectangle */
+              .color-box {
+                width: 20px;
+                height: 15px;
+                margin-right: 2px;
+              }
+              .toggle-box {
+                margin-left: 0;
+                margin-top: 0;
+                margin-bottom: 0;
+                margin-left: 0;
+                margin-right: 2px;  
+              }
+              .color-label {
+                color: white;
+                font-size: 9px;
+              }
+            }
+          }
+        }
+        .cursor-readout {
+          position: absolute;
+          pointer-events: none;
+          color: #fff;
+          background-color:rgba(0,0,0,0.1);
+        } 
+        .about-button {
+          position: fixed;
+          bottom: 60px;
+          right: 20px;
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          background-image: url('/apps/live-planet/mapmastery.png'); /* Replace with your image path */
+          background-size: cover;
+          background-position: center;
+          border: none;
+          cursor: pointer;
+          transition: transform 0.3s ease;
+          :hover {
+            width: 60px;
+            height: 60px;
+            transform: scale(1.2);
+          }   
+          :active {
+            background-color: black;
+          }
+          .hover-image {
+            width: 60px;
+            height: 60px;
+          } 
+        }
+        .about-popup {
+          position: fixed;
+          bottom: 110px;
+          right: 10px;
+          width: 300px;
+          border-radius: 15px;
+          color: #fff;
+          background-color:rgba(100,100,100,0.5);
+        } 
+        .weather-table {
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          border-radius: 15px;
+          color: #fff;
+          background-color:rgba(100,100,100,0.2);
+          pointer-events: none;
+          th, td {
+            border: 1px solid #ccc;
+            padding: 0.5rem;
+            text-align: center;
+            font-size: 11px;
+          }
+        } 
+      }
+    </style>
+    <script type="module" crossorigin src="/apps/live-planet/index.js"></script>
+  </head>
+  <body>
+    <div id="app" class="main-view">
+      <div id="cesiumContainer" :style="{height:g_cesiumViewHeight+'px'}" class="cesium-container"></div>
+
+      <table id="settings" class="settings" :style="{ backgroundColor: g_isCursorOnSettings ? 'rgba(100, 100, 100, 0.7)' : 'rgba(100, 100, 100, 0.3)' }">
+        <tbody id="settingsBody" class="settings-body" :style="{maxHeight:g_tableHeight+'px'}">
+          <tr>
+            <td>
+              <div class="link-container">
+                <a href="../../index.html" class="top-link">Home Page</a>
+              </div>        
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <select id="timeseries" class="timeseries-select" v-model="g_selectedTime">
+                <option class="timeseries-option"
+                        v-for="(item,index) in g_selectableTimeseries"
+                        v-bind:key="index" :value="index">{{item.slice(0, -3)}} 
+                </option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <select id="variables" class="timeseries-select" v-model="g_selectedVariable" @change="selectedVariableChanged($event)">
+                <option class="timeseries-option"
+                        v-for="(item,index) in g_variables"
+                        v-bind:key="index" :value="index">{{item.label}} 
+                </option>
+              </select>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <ul class="listbox">
+                <li v-for="(item, index) in g_colorBar" :key="index" class="listbox-item">
+                  <div class="color-box" :style="g_showContours ? item.colorStyle : item.gradientStyle"></div>
+                  <input type="checkbox" id="showColor" class="toggle-box" :style="{opacity: g_showContours ? 1 : 0}" v-model="item.mask" @change="colorChecked($event)"/>
+                  <span class="color-label">{{item.label}}</span>
+                </li>
+              </ul>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="layerAlphaLabel" class="option-label">
+                <input type="range" id="layerAlpha" class="slider" min="0" max="100" v-model="g_layerAlpha" title="Set the transparency of the contour layer."  @change="onLayerAlphaChanged($event)">
+                Layer Alpha
+              </label>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="showWeatherMap" class="option-label">
+                <input type="checkbox" id="showWeatherMapCheckbox" class="option-checkbox" v-model="g_showWeatherMap" title="Check on to show the weather map." @change="showWeatherMapChecked($event)"/>
+                Show Weather Map</label>
+            </td>
+          </tr> 
+          <tr>
+            <td>
+              <label id="showWindAnimation" class="option-label">
+                <input type="checkbox" id="showWindAnimationCheckbox" class="option-checkbox" v-model="g_showWindAnimation" title="Check on to show wind animation." @change="showWindAnimationChecked($event)"/>
+                Show Wind</label>
+            </td>
+          </tr>  
+          <tr>
+            <td>
+              <label id="showWeatherTable" class="option-label">
+                <input type="checkbox" id="showWeatherTableCheckbox" class="option-checkbox" v-model="g_showWeatherTable" @change="showWeatherTableChecked($event)" title="Check on to show the weather table for the screen center location."/>
+                Show Weather Table</label>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <label id="showPowerPlants" class="option-label">
+                <input type="checkbox" id="showPowerPlantsCheckbox" class="option-checkbox" v-model="g_showPowerPlants" title="Check on to show the coal-fired power plants."  @change="showPowerPlantsChecked($event)"/>
+                Coal-fired Power Stations</label>
+            </td>
+          </tr>  
+          <tr>
+            <td>
+              <select id="powerplants" class="timeseries-select" v-model="g_selectedPowerPlantIndex" @change="selectedPowerPlantChanged($event)">
+                <option class="timeseries-option"
+                        v-for="(item,index) in g_powerPlantList"
+                        v-bind:key="index" :value="index">{{item.properties.Name}}, {{item.properties.Capacity}} MW
+                </option>
+              </select>
+            </td>
+          </tr>      
+          <tr>
+            <td>
+              <label id="showContours" class="option-label">
+                <input type="checkbox" id="showContoursCheckbox" class="option-checkbox" v-model="g_showContours" title="Check on to show contours." @change="showContoursChecked($event)"/>
+                Show Contours</label>
+            </td>
+          </tr>        
+          <tr>
+            <td>
+              <label id="showGrid" class="option-label">
+                <input type="checkbox" id="showGridCheckbox" class="option-checkbox" v-model="g_showGrid" title="Show the adaptive grid lines." @change="showGridChecked($event)"/>
+                Show Grid Lines</label>
+            </td>
+          </tr>
+          <!-- <tr>
+            <td>
+              <label id="labelGridCells" class="option-label">
+                <input type="checkbox" id="labelGridCellsCheckbox" class="option-checkbox" v-model="g_labelGridCells" title="Labels are shown when the camera altitude is below 600km." @change="labelGridCellsChecked($event)"/>
+                Label Cell Values
+              </label>
+            </td>
+          </tr> -->
+          <tr>
+            <td>
+              <label id="enableBilinear" class="option-label">
+                <input type="checkbox" id="enableBilinearCheckbox" class="option-checkbox" v-model="g_enableBilinearSampling" title="Disable bilinear sampling to see grid cell boundaries." @change="enableBilinearChecked($event)"/>
+                Bilinear Sampling
+              </label>
+            </td>
+          </tr>
+          <!-- <tr>
+            <td>
+              <input type="text" style="width: 50px;margin-right:5px;background-color: rgba(150, 150, 150, 0.7);vertical-align:middle;" v-model="g_cesiumIonToke"/>
+              <button type="submit" style="color:White;background-color: rgba(150, 150, 150, 0.8);vertical-align:middle" @click="enterToken" title="Enter your Cesium ion Access Token. It is needed for viewing high-resolution imagery.">Ion Token</button>
+            </td>
+          </tr> -->
+        </tbody>
+      </table>
+
+      <table id="cursorReadout" class="cursor-readout" :style="{top:g_cursorScreenCoords.y+'px',left:g_cursorScreenCoords.x+'px'}" v-show="g_showCursorReadout">
+        <tr>
+            <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+            <td>{{g_cursorReadout}}</td>
+        </tr>
+        <tr>
+            <td>&nbsp;&nbsp;&nbsp;&nbsp;</td>
+            <td>{{g_animationTime}}</td>
+        </tr>
+      </table>
+
+      <table id="aboutPopup" class="about-popup" v-show="g_isAboutOn">
+        <tr>
+            <td>      
+              <a style="color:aqua" href = "http://map-mastery.com/live-planet"><b>Live Planet</b></a>    
+               is a Cesium-based interactive 3D globe developed by Map Mastery Consulting to show the real-time global weather forecast. 
+            </td>
+            <td>
+
+            </td>
+        </tr>
+        <tr>
+            <td> 
+              <p>
+                <a style="color:aqua" href = "http://map-mastery.com/"><b>Map Mastery</b></a>
+                provides specialized consulting services focusing on bridging the gap between GIS, virtual reality and digital twins.
+                <br>
+                <a style="color:aqua" href = "mailto: contact@map-mastery.com">contact@map-mastery.com</a>
+              </p>
+            </td>
+            <td></td>
+        </tr>
+      </table>
+      
+      <button id="aboutBtn" class="about-button" v-show="g_isAboutBtnOn" @mouseover="mouseOverAbout" @mouseleave="mouseLeaveAbout"
+        @click="aboutClick" :style="{ backgroundColor: g_isAboutOn ? 'rgba(0, 0, 0, 0)' : 'rgba(255, 255, 255, 1)' }"
+        :title="g_aboutTooltip">
+        <img src="/apps/live-planet/mapmastery.png" id="hoverImage" class="hover-image" v-show="g_hoverAbout">
+      </button>
+
+      <table id="weatherTable" class="weather-table" v-if="g_showWeatherTable">
+        <thead>
+          <tr>
+            <th>Weather</th>
+            <th v-for="(item, index) in g_weatherStats['Cloud']" :key="index">
+              {{ item?.dayofweek }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(values, variable) in g_weatherStats" :key="variable">
+            <td>{{ variable }} ({{g_unitsLookup[variable]}})</td>
+            <td v-for="(item, index) in values" :key="index">
+              {{ item?.label }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </body>
+</html>
